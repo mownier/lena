@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
-	endpoints "lena/jsonendpoints"
+	"lena/endpoints/httpendpoint"
+	"lena/server"
+	"lena/storages/inmemorystorage"
 	"log"
 	"net"
 	"net/http"
@@ -14,10 +16,6 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	http.HandleFunc("/signin", endpoints.SignIn)
-	http.HandleFunc("/register", endpoints.Register)
-	http.HandleFunc("/signout", endpoints.SignOut)
-	http.HandleFunc("/verify", endpoints.Verify)
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		log.Fatalf("Error getting network interfaces: %v", err)
@@ -30,7 +28,11 @@ func main() {
 			}
 		}
 	}
-	err = http.ListenAndServe(":"+port, nil)
+	storage := inmemorystorage.NewInMemoryStorage()
+	authServer := server.NewAuthServer(storage, storage)
+	mux := http.NewServeMux()
+	httpendpoint.SetupHTTPHandlers(mux, authServer)
+	err = http.ListenAndServe(":"+port, mux)
 	if err != nil {
 		log.Fatalln("Error startng server:", err)
 	}
