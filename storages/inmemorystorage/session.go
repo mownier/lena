@@ -48,7 +48,7 @@ func (s *InMemoryStorage) getSessionByAccessToken(ctx context.Context, accessTok
 	}
 	session, exists := s.sessions[accessToken]
 	if !exists {
-		return models.Session{}, errors.New("session does exist")
+		return models.Session{}, errors.New("session does not exist")
 	}
 	return session, nil
 }
