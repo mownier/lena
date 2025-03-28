@@ -1,3 +1,3 @@
 # lena
 
-an authentication service
+A session management service
