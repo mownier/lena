@@ -2,7 +2,7 @@ package httpendpoint
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"lena/auth"
 	"net/http"
 )
@@ -13,7 +13,7 @@ func registerHandler(server *auth.Server) http.HandlerFunc {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

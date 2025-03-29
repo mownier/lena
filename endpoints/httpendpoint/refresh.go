@@ -2,7 +2,7 @@ package httpendpoint
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"lena/auth"
 	"net/http"
 )
@@ -18,7 +18,7 @@ func refreshHandler(server *auth.Server) http.HandlerFunc {
 			http.Error(w, "not authorized", http.StatusUnauthorized)
 			return
 		}
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
