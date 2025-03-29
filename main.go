@@ -16,6 +16,7 @@ import (
 	"strings"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 func main() {
@@ -43,6 +44,10 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error getting storage:", err)
 	}
+	enableReflection, err := getReflection()
+	if err != nil {
+		log.Fatalln("Error getting reflection:", err)
+	}
 	var userStorage storages.UserStorage
 	var sessionStorage storages.SessionStorage
 	if storage == "inmemory" {
@@ -56,7 +61,7 @@ func main() {
 		return
 	}
 	if endpoint == "grpc" {
-		runGRPCEndpoint(localIP, port, authServer)
+		runGRPCEndpoint(localIP, port, enableReflection, authServer)
 		return
 	}
 }
@@ -103,6 +108,21 @@ func getEndpoint() (string, error) {
 	return "", errors.New("selected endpoint option not found")
 }
 
+func getReflection() (bool, error) {
+	input := os.Getenv("LENA_REFLECTION")
+	if input == "" {
+		return false, nil
+	}
+	input = strings.ToLower(input)
+	if input == "false" {
+		return false, nil
+	}
+	if input == "true" {
+		return true, nil
+	}
+	return false, errors.New("selected reflection option not found")
+}
+
 func runHTTPEndpoint(localIP string, port int, authServer *auth.Server) {
 	mux := http.NewServeMux()
 	server := httpendpoint.NewServer(authServer)
@@ -113,12 +133,15 @@ func runHTTPEndpoint(localIP string, port int, authServer *auth.Server) {
 	}
 }
 
-func runGRPCEndpoint(localIP string, port int, authServer *auth.Server) {
+func runGRPCEndpoint(localIP string, port int, enableReflection bool, authServer *auth.Server) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		log.Fatalln("failed to listen:", err)
 	}
 	grpcServer := grpc.NewServer()
+	if enableReflection {
+		reflection.Register(grpcServer)
+	}
 	grpcendpoint.RegisterLenaServiceServer(grpcServer, grpcendpoint.NewServer(authServer))
 	fmt.Printf("lena GRPC server listening on: tcp://%s:%d\n", localIP, port)
 	if err := grpcServer.Serve(listener); err != nil {
