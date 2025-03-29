@@ -1,11 +1,11 @@
 package httpendpoint
 
 import (
-	"lena/server"
+	"lena/auth"
 	"net/http"
 )
 
-func SetupHTTPHandlers(mux *http.ServeMux, authServer *server.AuthServer) {
+func SetupHTTPHandlers(mux *http.ServeMux, authServer *auth.Server) {
 	mux.HandleFunc("/register", registerHandler(authServer))
 	mux.HandleFunc("/signin", signInHandler(authServer))
 	mux.HandleFunc("/signout", signOutHandler(authServer))
