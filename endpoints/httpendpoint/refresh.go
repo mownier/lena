@@ -3,11 +3,10 @@ package httpendpoint
 import (
 	"encoding/json"
 	"io"
-	"lena/auth"
 	"net/http"
 )
 
-func refreshHandler(server *auth.Server) http.HandlerFunc {
+func (s *Server) refreshHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -30,7 +29,7 @@ func refreshHandler(server *auth.Server) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		session, err := server.Refresh(r.Context(), accessToken, request.RefreshToken)
+		session, err := s.authServer.Refresh(r.Context(), accessToken, request.RefreshToken)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return

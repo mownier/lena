@@ -5,10 +5,18 @@ import (
 	"net/http"
 )
 
-func SetupHTTPHandlers(mux *http.ServeMux, authServer *auth.Server) {
-	mux.HandleFunc("/register", registerHandler(authServer))
-	mux.HandleFunc("/signin", signInHandler(authServer))
-	mux.HandleFunc("/signout", signOutHandler(authServer))
-	mux.HandleFunc("/verify", verifyHandler(authServer))
-	mux.HandleFunc("/refresh", refreshHandler(authServer))
+type Server struct {
+	authServer *auth.Server
+}
+
+func NewServer(authServer *auth.Server) *Server {
+	return &Server{authServer: authServer}
+}
+
+func (s *Server) Setup(mux *http.ServeMux) {
+	mux.HandleFunc("/register", s.registerHandler())
+	mux.HandleFunc("/signin", s.signInHandler())
+	mux.HandleFunc("/signout", s.signOutHandler())
+	mux.HandleFunc("/verify", s.verifyHandler())
+	mux.HandleFunc("/refresh", s.refreshHandler())
 }

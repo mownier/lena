@@ -3,11 +3,10 @@ package httpendpoint
 import (
 	"encoding/json"
 	"io"
-	"lena/auth"
 	"net/http"
 )
 
-func registerHandler(server *auth.Server) http.HandlerFunc {
+func (s *Server) registerHandler() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -25,7 +24,7 @@ func registerHandler(server *auth.Server) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		session, err := server.Register(r.Context(), request.Name, request.Password)
+		session, err := s.authServer.Register(r.Context(), request.Name, request.Password)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return

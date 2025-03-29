@@ -105,7 +105,8 @@ func getEndpoint() (string, error) {
 
 func runHTTPEndpoint(localIP string, port int, authServer *auth.Server) {
 	mux := http.NewServeMux()
-	httpendpoint.SetupHTTPHandlers(mux, authServer)
+	server := httpendpoint.NewServer(authServer)
+	server.Setup(mux)
 	fmt.Printf("lena HTTP server listening on: http://%s:%d\n", localIP, port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", port), mux); err != nil {
 		log.Fatalln("failed to serve:", err)
