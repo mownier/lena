@@ -16,33 +16,33 @@ service LenaService {
 }
 
 message RegisterRequest {
-    string userName = 1;
+    string name = 1;
     string password = 2;
 }
 
 message SignInRequest {
-    string userName = 1;
+    string name = 1;
     string password = 2;
 }
 
 message RefreshRequest {
-    string refreshToken = 1;
+    string refresh_token = 1;
 }
 
 message RegisterResponse {
-    string accessToken = 1;
-    string refreshToken = 2;
-    google.protobuf.Timestamp expiresOn = 3;
+    string access_token = 1;
+    string refresh_token = 2;
+    google.protobuf.Timestamp expires_on = 3;
 }
 
 message SignInResponse {
-    string accessToken = 1;
-    string refreshToken = 2;
-    google.protobuf.Timestamp expiresOn = 3;
+    string access_token = 1;
+    string refresh_token = 2;
+    google.protobuf.Timestamp expires_on = 3;
 }
 
 message RefreshResponse {
-    string accessToken = 1;
-    string refreshToken = 2;
-    google.protobuf.Timestamp expiresOn = 3;
+    string access_token = 1;
+    string refresh_token = 2;
+    google.protobuf.Timestamp expires_on = 3;
 }
