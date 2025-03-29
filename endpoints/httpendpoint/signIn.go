@@ -3,11 +3,11 @@ package httpendpoint
 import (
 	"encoding/json"
 	"io/ioutil"
-	"lena/server"
+	"lena/auth"
 	"net/http"
 )
 
-func signInHandler(server *server.AuthServer) http.HandlerFunc {
+func signInHandler(server *auth.Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

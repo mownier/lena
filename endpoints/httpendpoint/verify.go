@@ -1,11 +1,11 @@
 package httpendpoint
 
 import (
-	"lena/server"
+	"lena/auth"
 	"net/http"
 )
 
-func verifyHandler(server *server.AuthServer) http.HandlerFunc {
+func verifyHandler(server *auth.Server) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
