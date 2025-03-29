@@ -20,7 +20,7 @@ func NewServer(authServer *auth.Server) *Server {
 }
 
 func (s *Server) Register(ctx context.Context, in *RegisterRequest) (*RegisterResponse, error) {
-	session, err := s.authServer.Register(ctx, in.UserName, in.Password)
+	session, err := s.authServer.Register(ctx, in.Name, in.Password)
 	if err != nil {
 		return &RegisterResponse{}, err
 	}
@@ -33,7 +33,7 @@ func (s *Server) Register(ctx context.Context, in *RegisterRequest) (*RegisterRe
 }
 
 func (s *Server) SignIn(ctx context.Context, in *SignInRequest) (*SignInResponse, error) {
-	session, err := s.authServer.SignIn(ctx, in.UserName, in.Password)
+	session, err := s.authServer.SignIn(ctx, in.Name, in.Password)
 	if err != nil {
 		return &SignInResponse{}, err
 	}
