@@ -1,4 +1,4 @@
-package server
+package auth
 
 import (
 	"context"
@@ -14,16 +14,16 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type AuthServer struct {
+type Server struct {
 	userStorage    storages.UserStorage
 	sessionStorage storages.SessionStorage
 }
 
-func NewAuthServer(userStorage storages.UserStorage, sessionStorage storages.SessionStorage) *AuthServer {
-	return &AuthServer{userStorage: userStorage, sessionStorage: sessionStorage}
+func NewServer(userStorage storages.UserStorage, sessionStorage storages.SessionStorage) *Server {
+	return &Server{userStorage: userStorage, sessionStorage: sessionStorage}
 }
 
-func (s *AuthServer) Register(ctx context.Context, name string, password string) (models.Session, error) {
+func (s *Server) Register(ctx context.Context, name string, password string) (models.Session, error) {
 	hashedPassword, err := s.hashPassword(password)
 	if err != nil {
 		return models.Session{}, err
@@ -41,7 +41,7 @@ func (s *AuthServer) Register(ctx context.Context, name string, password string)
 	return session, nil
 }
 
-func (s *AuthServer) SignIn(ctx context.Context, name string, password string) (models.Session, error) {
+func (s *Server) SignIn(ctx context.Context, name string, password string) (models.Session, error) {
 	user, err := s.userStorage.GetUserByName(ctx, name)
 	if err != nil {
 		return models.Session{}, err
@@ -58,7 +58,7 @@ func (s *AuthServer) SignIn(ctx context.Context, name string, password string) (
 	return session, nil
 }
 
-func (s *AuthServer) SignOut(ctx context.Context, accessToken string) error {
+func (s *Server) SignOut(ctx context.Context, accessToken string) error {
 	session, err := s.sessionStorage.GetSessionByAccessToken(ctx, accessToken)
 	if err != nil {
 		return nil
@@ -73,14 +73,14 @@ func (s *AuthServer) SignOut(ctx context.Context, accessToken string) error {
 	return nil
 }
 
-func (s *AuthServer) Verify(ctx context.Context, accessToken string) error {
+func (s *Server) Verify(ctx context.Context, accessToken string) error {
 	if _, err := s.verify(ctx, accessToken); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (s *AuthServer) Refresh(ctx context.Context, accessToken string, refreshToken string) (models.Session, error) {
+func (s *Server) Refresh(ctx context.Context, accessToken string, refreshToken string) (models.Session, error) {
 	session, err := s.verify(ctx, accessToken)
 	if err != nil {
 		return models.Session{}, err
@@ -100,7 +100,7 @@ func (s *AuthServer) Refresh(ctx context.Context, accessToken string, refreshTok
 	return session, nil
 }
 
-func (s *AuthServer) verify(ctx context.Context, accessToken string) (models.Session, error) {
+func (s *Server) verify(ctx context.Context, accessToken string) (models.Session, error) {
 	session, err := s.sessionStorage.GetSessionByAccessToken(ctx, accessToken)
 	if err != nil {
 		return models.Session{}, err
@@ -121,7 +121,7 @@ func (s *AuthServer) verify(ctx context.Context, accessToken string) (models.Ses
 	return session, nil
 }
 
-func (s *AuthServer) hashPassword(password string) (string, error) {
+func (s *Server) hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", err
@@ -129,7 +129,7 @@ func (s *AuthServer) hashPassword(password string) (string, error) {
 	return string(hash), nil
 }
 
-func (s *AuthServer) verifyPassword(input string, stored string) error {
+func (s *Server) verifyPassword(input string, stored string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input))
 	if err != nil {
 		return errors.New("invalid password")
@@ -137,7 +137,7 @@ func (s *AuthServer) verifyPassword(input string, stored string) error {
 	return nil
 }
 
-func (s *AuthServer) newSessionUpdateForArchiving() models.SessionUpdate {
+func (s *Server) newSessionUpdateForArchiving() models.SessionUpdate {
 	archivedOn := time.Now().UTC()
 	archived := true
 	return models.SessionUpdate{
@@ -146,7 +146,7 @@ func (s *AuthServer) newSessionUpdateForArchiving() models.SessionUpdate {
 	}
 }
 
-func (s *AuthServer) newUser(name string, password string) models.User {
+func (s *Server) newUser(name string, password string) models.User {
 	return models.User{
 		Name:      name,
 		Password:  password,
@@ -154,7 +154,7 @@ func (s *AuthServer) newUser(name string, password string) models.User {
 	}
 }
 
-func (s *AuthServer) newToken(variable string) string {
+func (s *Server) newToken(variable string) string {
 	random := rand.Intn(1_000_000_000_000)
 	now := time.Now().UnixNano()
 	input := fmt.Sprintf("%s-%d-%d", variable, now, random)
@@ -164,7 +164,7 @@ func (s *AuthServer) newToken(variable string) string {
 	return hex.EncodeToString(hashSum)
 }
 
-func (s *AuthServer) newSession(userName string) models.Session {
+func (s *Server) newSession(userName string) models.Session {
 	accessToken := s.newToken(userName)
 	return models.Session{
 		AccessToken:        accessToken,
