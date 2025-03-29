@@ -48,14 +48,11 @@ func main() {
 	if err != nil {
 		log.Fatalln("Error getting reflection:", err)
 	}
-	var userStorage storages.UserStorage
-	var sessionStorage storages.SessionStorage
+	var store storages.Storage
 	if storage == "inmemory" {
-		inmemorystorage := inmemorystorage.NewInMemoryStorage()
-		userStorage = inmemorystorage
-		sessionStorage = inmemorystorage
+		store = inmemorystorage.NewInMemoryStorage()
 	}
-	authServer := auth.NewServer(userStorage, sessionStorage)
+	authServer := auth.NewServer(store)
 	if endpoint == "http" {
 		runHTTPEndpoint(localIP, port, authServer)
 		return

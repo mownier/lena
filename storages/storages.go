@@ -5,6 +5,11 @@ import (
 	"lena/models"
 )
 
+type Storage interface {
+	UserStorage
+	SessionStorage
+}
+
 type UserStorage interface {
 	AddUser(ctx context.Context, user models.User) error
 	GetUserByName(ctx context.Context, name string) (models.User, error)

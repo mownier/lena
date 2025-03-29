@@ -15,12 +15,11 @@ import (
 )
 
 type Server struct {
-	userStorage    storages.UserStorage
-	sessionStorage storages.SessionStorage
+	storage storages.Storage
 }
 
-func NewServer(userStorage storages.UserStorage, sessionStorage storages.SessionStorage) *Server {
-	return &Server{userStorage: userStorage, sessionStorage: sessionStorage}
+func NewServer(storage storages.Storage) *Server {
+	return &Server{storage: storage}
 }
 
 func (s *Server) Register(ctx context.Context, name string, password string) (models.Session, error) {
@@ -29,12 +28,12 @@ func (s *Server) Register(ctx context.Context, name string, password string) (mo
 		return models.Session{}, err
 	}
 	user := s.newUser(name, hashedPassword)
-	err = s.userStorage.AddUser(ctx, user)
+	err = s.storage.AddUser(ctx, user)
 	if err != nil {
 		return models.Session{}, err
 	}
 	session := s.newSession(name)
-	err = s.sessionStorage.AddSession(ctx, session)
+	err = s.storage.AddSession(ctx, session)
 	if err != nil {
 		return models.Session{}, err
 	}
@@ -42,7 +41,7 @@ func (s *Server) Register(ctx context.Context, name string, password string) (mo
 }
 
 func (s *Server) SignIn(ctx context.Context, name string, password string) (models.Session, error) {
-	user, err := s.userStorage.GetUserByName(ctx, name)
+	user, err := s.storage.GetUserByName(ctx, name)
 	if err != nil {
 		return models.Session{}, err
 	}
@@ -51,7 +50,7 @@ func (s *Server) SignIn(ctx context.Context, name string, password string) (mode
 		return models.Session{}, err
 	}
 	session := s.newSession(name)
-	err = s.sessionStorage.AddSession(ctx, session)
+	err = s.storage.AddSession(ctx, session)
 	if err != nil {
 		return models.Session{}, err
 	}
@@ -59,14 +58,14 @@ func (s *Server) SignIn(ctx context.Context, name string, password string) (mode
 }
 
 func (s *Server) SignOut(ctx context.Context, accessToken string) error {
-	session, err := s.sessionStorage.GetSessionByAccessToken(ctx, accessToken)
+	session, err := s.storage.GetSessionByAccessToken(ctx, accessToken)
 	if err != nil {
 		return nil
 	}
 	if session.Archived {
 		return errors.New("session is already invalidated")
 	}
-	_, err = s.sessionStorage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
+	_, err = s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
 	if err != nil {
 		return nil
 	}
@@ -88,12 +87,12 @@ func (s *Server) Refresh(ctx context.Context, accessToken string, refreshToken s
 	if session.RefreshToken != refreshToken {
 		return models.Session{}, errors.New("invalid refresh token")
 	}
-	_, err = s.sessionStorage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
+	_, err = s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
 	if err != nil {
 		return models.Session{}, err
 	}
 	session = s.newSession(session.UserName)
-	err = s.sessionStorage.AddSession(ctx, session)
+	err = s.storage.AddSession(ctx, session)
 	if err != nil {
 		return models.Session{}, err
 	}
@@ -101,7 +100,7 @@ func (s *Server) Refresh(ctx context.Context, accessToken string, refreshToken s
 }
 
 func (s *Server) verify(ctx context.Context, accessToken string) (models.Session, error) {
-	session, err := s.sessionStorage.GetSessionByAccessToken(ctx, accessToken)
+	session, err := s.storage.GetSessionByAccessToken(ctx, accessToken)
 	if err != nil {
 		return models.Session{}, err
 	}
@@ -115,7 +114,7 @@ func (s *Server) verify(ctx context.Context, accessToken string) (models.Session
 		return models.Session{}, errors.New("session is already expired")
 	}
 	if refreshTokenExpired {
-		s.sessionStorage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
+		s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
 		return models.Session{}, errors.New("session can no longer be extended")
 	}
 	return session, nil
