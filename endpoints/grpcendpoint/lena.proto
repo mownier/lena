@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package grpcendpoints;
+
+option go_package = "lena/endpoints/grpcendpoint";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service LenaService {
+    rpc Register (RegisterRequest) returns (RegisterResponse) {}
+    rpc SignIn (SignInRequest) returns (SignInResponse) {}
+    rpc SignOut (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc Verify (google.protobuf.Empty) returns (google.protobuf.Empty) {}
+    rpc Refresh (RefreshRequest) returns (RefreshResponse) {}
+}
+
+message RegisterRequest {
+    string userName = 1;
+    string password = 2;
+}
+
+message SignInRequest {
+    string userName = 1;
+    string password = 2;
+}
+
+message RefreshRequest {
+    string refreshToken = 1;
+}
+
+message RegisterResponse {
+    string accessToken = 1;
+    string refreshToken = 2;
+    google.protobuf.Timestamp expiresOn = 3;
+}
+
+message SignInResponse {
+    string accessToken = 1;
+    string refreshToken = 2;
+    google.protobuf.Timestamp expiresOn = 3;
+}
+
+message RefreshResponse {
+    string accessToken = 1;
+    string refreshToken = 2;
+    google.protobuf.Timestamp expiresOn = 3;
+}
