@@ -26,7 +26,7 @@ func (s *Server) Register(ctx context.Context, in *RegisterRequest) (*RegisterRe
 	}
 	response := RegisterResponse{
 		AccessToken:  session.AccessToken,
-		RefreshToken: session.AccessToken,
+		RefreshToken: session.RefreshToken,
 		ExpiresOn:    timestamppb.New(session.AccesTokenExpiry),
 	}
 	return &response, nil
