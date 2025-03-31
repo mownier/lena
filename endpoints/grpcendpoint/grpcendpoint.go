@@ -3,9 +3,16 @@ package grpcendpoint
 import (
 	context "context"
 	"errors"
+	"fmt"
 	"lena/auth"
+	"log"
+	"net"
 
+	"lena/config"
+
+	grpc "google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/reflection"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -100,4 +107,20 @@ func (s *Server) extractAccessToken(ctx context.Context) (string, error) {
 		return "", errors.New("not authorized")
 	}
 	return accessToken, nil
+}
+
+func ListenAndServe(config config.Config, authServer *auth.Server) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", config.Port))
+	if err != nil {
+		log.Fatalln("failed to listen:", err)
+	}
+	grpcServer := grpc.NewServer()
+	if config.Reflection {
+		reflection.Register(grpcServer)
+	}
+	RegisterLenaServiceServer(grpcServer, NewServer(authServer))
+	fmt.Printf("lena GRPC server listening on: tcp://%s:%d\n", config.LocalIP, config.Port)
+	if err := grpcServer.Serve(listener); err != nil {
+		log.Fatalln("failed to server:", err)
+	}
 }
