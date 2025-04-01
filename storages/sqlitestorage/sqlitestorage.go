@@ -80,3 +80,7 @@ func migrate(db *sql.DB) error {
 func toTime(str string) (time.Time, error) {
 	return time.Parse("2006-01-02 15:04:05-07:00", str)
 }
+
+func toBool(i int) bool {
+	return i != 0
+}

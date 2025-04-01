@@ -21,6 +21,7 @@ func migrations() []migration {
 		migration2(),
 		migration3(),
 		migration4(),
+		migration5(),
 	}
 	sort.Slice(list, func(i, j int) bool {
 		return list[i].version < list[j].version

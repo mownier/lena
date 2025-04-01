@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"lena/models"
-	"lena/util"
 	"strings"
 )
 
@@ -47,8 +46,8 @@ func (s *SqliteStorage) AddSession(ctx context.Context, session models.Session) 
 			VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 		session.AccessToken, session.RefreshToken, session.UserName,
-		float64(session.AccesTokenExpiry.Unix()), float64(session.RefreshTokenExpiry.Unix()), float64(session.CreatedOn.Unix()),
-		float64(session.ArchivedOn.Unix()), util.FromBoolToInt(session.Archived),
+		session.AccesTokenExpiry, session.RefreshTokenExpiry, session.CreatedOn,
+		session.ArchivedOn, session.Archived,
 	)
 	if err != nil {
 		return err
@@ -105,12 +104,12 @@ func (s *SqliteStorage) UpdateSessionByAccessToken(ctx context.Context, accessTo
 	columnValues := []any{}
 	if update.ArchivedOn != nil {
 		columnNames = append(columnNames, "archived_on = ?")
-		columnValues = append(columnValues, util.FromTimeToFloat64(*update.ArchivedOn))
+		columnValues = append(columnValues, *update.ArchivedOn)
 		hasUpdate = true
 	}
 	if update.Archived != nil {
 		columnNames = append(columnNames, "archived = ?")
-		columnValues = append(columnValues, util.FromBoolToInt(*update.Archived))
+		columnValues = append(columnValues, *update.Archived)
 		hasUpdate = true
 	}
 	if !hasUpdate {
@@ -156,10 +155,10 @@ func (s *SqliteStorage) getSessionByAccessToken(ctx context.Context, accessToken
 		accessToken,
 	)
 	var session models.Session
-	var accessTokenExpiry float64
-	var refresTokenExpiry float64
-	var createdOn float64
-	var archivedOn float64
+	var accessTokenExpiry string
+	var refresTokenExpiry string
+	var createdOn string
+	var archivedOn string
 	var archived int
 	err := row.Scan(
 		&session.AccessToken, &session.RefreshToken, &session.UserName,
@@ -169,10 +168,22 @@ func (s *SqliteStorage) getSessionByAccessToken(ctx context.Context, accessToken
 	if err != nil {
 		return models.Session{}, err
 	}
-	session.AccesTokenExpiry = util.FromFloat64ToTime(accessTokenExpiry).UTC()
-	session.RefreshTokenExpiry = util.FromFloat64ToTime(refresTokenExpiry).UTC()
-	session.CreatedOn = util.FromFloat64ToTime(createdOn).UTC()
-	session.ArchivedOn = util.FromFloat64ToTime(archivedOn).UTC()
-	session.Archived = util.FromIntToBool(archived)
+	session.AccesTokenExpiry, err = toTime(accessTokenExpiry)
+	if err != nil {
+		return models.Session{}, err
+	}
+	session.RefreshTokenExpiry, err = toTime(refresTokenExpiry)
+	if err != nil {
+		return models.Session{}, err
+	}
+	session.CreatedOn, err = toTime(createdOn)
+	if err != nil {
+		return models.Session{}, err
+	}
+	session.ArchivedOn, err = toTime(archivedOn)
+	if err != nil {
+		return models.Session{}, err
+	}
+	session.Archived = toBool(archived)
 	return session, nil
 }
