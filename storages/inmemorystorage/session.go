@@ -9,12 +9,9 @@ import (
 func (s *InMemoryStorage) AddSession(ctx context.Context, session models.Session) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	stored, exists := s.sessions[session.AccessToken]
+	_, exists := s.sessions[session.AccessToken]
 	if exists {
 		return errors.New("session already exists")
-	}
-	if session.RefreshToken == stored.RefreshToken {
-		return errors.New("refresh token duplicated")
 	}
 	s.sessions[session.AccessToken] = session
 	return nil
