@@ -8,14 +8,19 @@ import (
 )
 
 func (s *SqliteStorage) AddUser(ctx context.Context, user models.User) error {
-	exists, err := s.checkUserIfExistingByName(ctx, user.Name)
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	exists, err := s.checkUserIfExistingByName(ctx, user.Name, tx)
 	if err != nil {
 		return err
 	}
 	if exists {
 		return errors.New("user already exists")
 	}
-	_, err = s.db.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`
 		INSERT INTO users 
 			(name, password, created_on)
@@ -26,11 +31,20 @@ func (s *SqliteStorage) AddUser(ctx context.Context, user models.User) error {
 	if err != nil {
 		return err
 	}
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.User, error) {
-	row := s.db.QueryRowContext(ctx,
+	tx, err := s.db.Begin()
+	if err != nil {
+		return models.User{}, err
+	}
+	defer tx.Rollback()
+	row := tx.QueryRowContext(ctx,
 		`
 		SELECT name, password, created_on
 			FROM users
@@ -40,7 +54,7 @@ func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.
 	)
 	var createdOn string
 	user := models.User{}
-	err := row.Scan(&user.Name, &user.Password, &createdOn)
+	err = row.Scan(&user.Name, &user.Password, &createdOn)
 	if err != nil {
 		return models.User{}, err
 	}
@@ -48,11 +62,15 @@ func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.
 	if err != nil {
 		return models.User{}, err
 	}
+	err = tx.Commit()
+	if err != nil {
+		return models.User{}, err
+	}
 	return user, nil
 }
 
-func (s *SqliteStorage) checkUserIfExistingByName(ctx context.Context, name string) (bool, error) {
-	row := s.db.QueryRowContext(ctx,
+func (s *SqliteStorage) checkUserIfExistingByName(ctx context.Context, name string, tx *sql.Tx) (bool, error) {
+	row := tx.QueryRowContext(ctx,
 		`
 		SELECT 1
 			FROM users
