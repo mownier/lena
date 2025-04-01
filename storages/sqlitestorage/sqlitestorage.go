@@ -3,6 +3,7 @@ package sqlitestorage
 import (
 	"database/sql"
 	"lena/storages"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -60,11 +61,11 @@ func migrate(db *sql.DB) error {
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec("INSERT INTO migrations (version) VALUES (?)", migration.version)
+		err = migration.modify(tx)
 		if err != nil {
 			return err
 		}
-		err = migration.modify(tx)
+		_, err = tx.Exec("INSERT INTO migrations (version) VALUES (?)", migration.version)
 		if err != nil {
 			return err
 		}
@@ -74,4 +75,8 @@ func migrate(db *sql.DB) error {
 		}
 	}
 	return nil
+}
+
+func toTime(str string) (time.Time, error) {
+	return time.Parse("2006-01-02 15:04:05-07:00", str)
 }

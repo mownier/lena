@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"lena/models"
-	"lena/util"
 )
 
 func (s *SqliteStorage) AddUser(ctx context.Context, user models.User) error {
@@ -22,7 +21,7 @@ func (s *SqliteStorage) AddUser(ctx context.Context, user models.User) error {
 			(name, password, created_on)
 			VALUES(?, ?, ?)
 		`,
-		user.Name, user.Password, float64(user.CreatedOn.Unix()),
+		user.Name, user.Password, user.CreatedOn,
 	)
 	if err != nil {
 		return err
@@ -39,13 +38,16 @@ func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.
 		`,
 		name,
 	)
+	var createdOn string
 	user := models.User{}
-	var createdOn float64
 	err := row.Scan(&user.Name, &user.Password, &createdOn)
 	if err != nil {
 		return models.User{}, err
 	}
-	user.CreatedOn = util.FromFloat64ToTime(createdOn).UTC()
+	user.CreatedOn, err = toTime(createdOn)
+	if err != nil {
+		return models.User{}, err
+	}
 	return user, nil
 }
 
