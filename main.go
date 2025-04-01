@@ -7,6 +7,7 @@ import (
 	"lena/endpoints/httpendpoint"
 	"lena/storages"
 	"lena/storages/inmemorystorage"
+	"lena/storages/sqlitestorage"
 	"log"
 )
 
@@ -18,6 +19,12 @@ func main() {
 	var store storages.Storage
 	if config.Storage == "inmemory" {
 		store = inmemorystorage.NewInMemoryStorage()
+	}
+	if config.Storage == "sqlite" {
+		store, err = sqlitestorage.NewSqliteStorage()
+		if err != nil {
+			log.Fatalln("Error creating sqlite db:", err)
+		}
 	}
 	authServer := auth.NewServer(store)
 	if config.Endpoint == "http" {
