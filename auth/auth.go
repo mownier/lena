@@ -60,14 +60,14 @@ func (s *Server) SignIn(ctx context.Context, name string, password string) (mode
 func (s *Server) SignOut(ctx context.Context, accessToken string) error {
 	session, err := s.storage.GetSessionByAccessToken(ctx, accessToken)
 	if err != nil {
-		return nil
+		return err
 	}
 	if session.Archived {
 		return errors.New("session is already invalidated")
 	}
 	_, err = s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
 	if err != nil {
-		return nil
+		return err
 	}
 	return nil
 }
