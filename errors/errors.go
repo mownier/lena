@@ -47,6 +47,10 @@ const (
 	ErrCodeHashingPassword
 	ErrCodeSessionCanNoLongerBeExtended
 	ErrCodeSessionExpired
+	ErrCodeHTTPMethodNotAllowed
+	ErrCodeHTTPBodyCannotBeRead
+	ErrCodeHTTPBodyMalformed
+	ErrCodeGeneratingResponse
 )
 
 var errMessages = map[int]string{
@@ -91,6 +95,31 @@ var errMessages = map[int]string{
 	ErrCodeHashingPassword:                             "problem on hashing password",
 	ErrCodeSessionCanNoLongerBeExtended:                "session can no longer be extended",
 	ErrCodeSessionExpired:                              "session has expired",
+	ErrCodeHTTPMethodNotAllowed:                        "method not allowed",
+	ErrCodeHTTPBodyCannotBeRead:                        "body of http request cannot be read",
+	ErrCodeHTTPBodyMalformed:                           "body of http request is malformed",
+	ErrCodeGeneratingResponse:                          "problem on generating response",
+}
+
+var userFriendlyErrMessages = map[int]string{
+	ErrCodeRegistering:           "Something went wrong while registering the user",
+	ErrCodeUserAlreadyExists:     "The name of the user to be registered is already used",
+	ErrCodeSigningIn:             "Something went wrong while signing in the user",
+	ErrCodeInvalidPassword:       "Password does not match with the name of the user",
+	ErrCodeUserDoesNotExist:      "The user is not yet registered",
+	ErrCodeGettingAccessToken:    "Something went wrong while validating the authentication of the user",
+	ErrCodeSigningOut:            "Something went wrong while signing out the user",
+	ErrCodeVerifyingAccessToken:  "Something went wrong while verifying the authentication of the user",
+	ErrCodeRefreshingAccessToken: "Something went wrong while refreshing the authentication of the user",
+	ErrCodeHTTPMethodNotAllowed:  "Method of the request is not allowed",
+	ErrCodeHTTPBodyCannotBeRead:  "Something went wrong while processing body of the request",
+	ErrCodeHTTPBodyMalformed:     "The content of the request's body is malformed",
+	ErrCodeGeneratingResponse:    "Unable to generate response",
+}
+
+type UserFriendlyResponse struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
 }
 
 type AppError struct {
@@ -98,6 +127,32 @@ type AppError struct {
 	Code    int
 	Message string
 	Other   error
+}
+
+func (e *AppError) ContainsCode(code int) (*AppError, bool) {
+	if code == e.Code {
+		return e, true
+	}
+	other := e.Other
+	for other != nil {
+		if appError, ok := other.(*AppError); ok {
+			if appError.Code == code {
+				return appError, true
+			}
+			other = appError.Other
+		} else {
+			return nil, false
+		}
+	}
+	return nil, false
+}
+
+func (e *AppError) AsUserFriendlyResponse() UserFriendlyResponse {
+	message, exists := userFriendlyErrMessages[e.Code]
+	if !exists {
+		message = "An unknown error has occurred"
+	}
+	return UserFriendlyResponse{Code: e.Code, Message: message}
 }
 
 func (e *AppError) Error() string {

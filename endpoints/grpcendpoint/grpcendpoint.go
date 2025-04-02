@@ -2,6 +2,7 @@ package grpcendpoint
 
 import (
 	context "context"
+	"encoding/json"
 	"fmt"
 	"lena/auth"
 	"lena/errors"
@@ -11,8 +12,10 @@ import (
 	"lena/config"
 
 	grpc "google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -28,41 +31,83 @@ func NewServer(authServer *auth.Server) *Server {
 
 func (s *Server) Register(ctx context.Context, in *RegisterRequest) (*RegisterResponse, error) {
 	session, err := s.authServer.Register(ctx, in.Name, in.Password)
-	if err != nil {
-		domain := fmt.Sprintf("grpcendpoint.Server.Register: in = %v", safeRegisterRequest{in})
-		return &RegisterResponse{}, errors.NewAppError(errors.ErrCodeRegistering, domain, err)
+	if err == nil {
+		response := RegisterResponse{
+			AccessToken:  session.AccessToken,
+			RefreshToken: session.RefreshToken,
+			ExpiresOn:    timestamppb.New(session.AccesTokenExpiry),
+		}
+		return &response, nil
 	}
-	response := RegisterResponse{
-		AccessToken:  session.AccessToken,
-		RefreshToken: session.RefreshToken,
-		ExpiresOn:    timestamppb.New(session.AccesTokenExpiry),
+	domain := fmt.Sprintf("grpcendpoint.Server.Register: in = %v", safeRegisterRequest{in})
+	appError := errors.NewAppError(errors.ErrCodeRegistering, domain, err)
+	var response errors.UserFriendlyResponse
+	if other, contains := appError.ContainsCode(errors.ErrCodeUserAlreadyExists); contains {
+		response = other.AsUserFriendlyResponse()
+	} else {
+		response = appError.AsUserFriendlyResponse()
 	}
-	return &response, nil
+	jsonData, jsonErr := json.Marshal(response)
+	var message string
+	if jsonErr != nil {
+		message = response.Message
+	} else {
+		message = string(jsonData)
+	}
+	return nil, status.Error(codes.Internal, message)
 }
 
 func (s *Server) SignIn(ctx context.Context, in *SignInRequest) (*SignInResponse, error) {
 	session, err := s.authServer.SignIn(ctx, in.Name, in.Password)
-	if err != nil {
-		domain := fmt.Sprintf("grpcendpoint.Server.SignIn: in = %v", safeSignInRequest{in})
-		return &SignInResponse{}, errors.NewAppError(errors.ErrCodeSigningIn, domain, err)
+	if err == nil {
+		response := SignInResponse{
+			AccessToken:  session.AccessToken,
+			RefreshToken: session.RefreshToken,
+			ExpiresOn:    timestamppb.New(session.AccesTokenExpiry),
+		}
+		return &response, nil
 	}
-	response := SignInResponse{
-		AccessToken:  session.AccessToken,
-		RefreshToken: session.RefreshToken,
-		ExpiresOn:    timestamppb.New(session.AccesTokenExpiry),
+	domain := fmt.Sprintf("grpcendpoint.Server.SignIn: in = %v", safeSignInRequest{in})
+	appError := errors.NewAppError(errors.ErrCodeSigningIn, domain, err)
+	var response errors.UserFriendlyResponse
+	if other, contains := appError.ContainsCode(errors.ErrCodeUserDoesNotExist); contains {
+		response = other.AsUserFriendlyResponse()
+	} else if other, contains := appError.ContainsCode(errors.ErrCodeInvalidPassword); contains {
+		response = other.AsUserFriendlyResponse()
+	} else {
+		response = appError.AsUserFriendlyResponse()
 	}
-	return &response, nil
+	jsonData, jsonErr := json.Marshal(response)
+	message := response.Message
+	if jsonErr == nil {
+		message = string(jsonData)
+	}
+	return nil, status.Error(codes.Internal, message)
 }
 
 func (s *Server) SignOut(ctx context.Context, emp *emptypb.Empty) (*emptypb.Empty, error) {
 	domain := "grpcendpoint.Server.SignOut"
 	accessToken, err := s.extractAccessToken(ctx)
 	if err != nil {
-		return &emptypb.Empty{}, errors.NewAppError(errors.ErrCodeGettingAccessToken, domain, err)
+		appError := errors.NewAppError(errors.ErrCodeGettingAccessToken, domain, err)
+		response := appError.AsUserFriendlyResponse()
+		jsonData, jsonErr := json.Marshal(response)
+		message := response.Message
+		if jsonErr == nil {
+			message = string(jsonData)
+		}
+		return nil, status.Error(codes.Internal, message)
 	}
 	err = s.authServer.SignOut(ctx, accessToken)
 	if err != nil {
-		return &emptypb.Empty{}, errors.NewAppError(errors.ErrCodeSigningOut, domain, err)
+		appError := errors.NewAppError(errors.ErrCodeSigningOut, domain, err)
+		response := appError.AsUserFriendlyResponse()
+		jsonData, jsonErr := json.Marshal(response)
+		message := response.Message
+		if jsonErr == nil {
+			message = string(jsonData)
+		}
+		return nil, status.Error(codes.Internal, message)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -71,11 +116,25 @@ func (s *Server) Verify(ctx context.Context, emp *emptypb.Empty) (*emptypb.Empty
 	domain := "grpcendpoint.Server.Verify"
 	accessToken, err := s.extractAccessToken(ctx)
 	if err != nil {
-		return &emptypb.Empty{}, errors.NewAppError(errors.ErrCodeGettingAccessToken, domain, err)
+		appError := errors.NewAppError(errors.ErrCodeGettingAccessToken, domain, err)
+		response := appError.AsUserFriendlyResponse()
+		jsonData, jsonErr := json.Marshal(response)
+		message := response.Message
+		if jsonErr == nil {
+			message = string(jsonData)
+		}
+		return nil, status.Error(codes.Internal, message)
 	}
 	err = s.authServer.Verify(ctx, accessToken)
 	if err != nil {
-		return &emptypb.Empty{}, errors.NewAppError(errors.ErrCodeVerifyingAccessToken, domain, err)
+		appError := errors.NewAppError(errors.ErrCodeVerifyingAccessToken, domain, err)
+		response := appError.AsUserFriendlyResponse()
+		jsonData, jsonErr := json.Marshal(response)
+		message := response.Message
+		if jsonErr == nil {
+			message = string(jsonData)
+		}
+		return nil, status.Error(codes.Internal, message)
 	}
 	return &emptypb.Empty{}, nil
 }
@@ -84,11 +143,25 @@ func (s *Server) Refresh(ctx context.Context, in *RefreshRequest) (*RefreshRespo
 	domain := fmt.Sprintf("grpcendpoint.Server.Refresh: in = %v", in)
 	accessToken, err := s.extractAccessToken(ctx)
 	if err != nil {
-		return &RefreshResponse{}, errors.NewAppError(errors.ErrCodeGettingAccessToken, domain, err)
+		appError := errors.NewAppError(errors.ErrCodeGettingAccessToken, domain, err)
+		response := appError.AsUserFriendlyResponse()
+		jsonData, jsonErr := json.Marshal(response)
+		message := response.Message
+		if jsonErr == nil {
+			message = string(jsonData)
+		}
+		return nil, status.Error(codes.Internal, message)
 	}
 	session, err := s.authServer.Refresh(ctx, accessToken, in.RefreshToken)
 	if err != nil {
-		return &RefreshResponse{}, errors.NewAppError(errors.ErrCodeRefreshingAccessToken, domain, err)
+		appError := errors.NewAppError(errors.ErrCodeRefreshingAccessToken, domain, err)
+		response := appError.AsUserFriendlyResponse()
+		jsonData, jsonErr := json.Marshal(response)
+		message := response.Message
+		if jsonErr == nil {
+			message = string(jsonData)
+		}
+		return nil, status.Error(codes.Internal, message)
 	}
 	response := RefreshResponse{
 		AccessToken:  session.AccessToken,

@@ -47,6 +47,13 @@ func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.
 		return models.User{}, errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
 	}
 	defer tx.Rollback()
+	exists, err := s.checkUserIfExistingByName(ctx, name, tx)
+	if err != nil {
+		return models.User{}, errors.NewAppError(errors.ErrCodeCheckingIfUserExists, domain, err)
+	}
+	if !exists {
+		return models.User{}, errors.NewAppError(errors.ErrCodeUserDoesNotExist, domain, nil)
+	}
 	row := tx.QueryRowContext(ctx,
 		`
 		SELECT name, password, created_on
