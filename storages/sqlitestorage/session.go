@@ -3,19 +3,20 @@ package sqlitestorage
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
+	"lena/errors"
 	"lena/models"
 	"strings"
 )
 
 func (s *SqliteStorage) AddSession(ctx context.Context, session models.Session) error {
+	domain := fmt.Sprintf("sqliteStorage.SqliteStorage.AddSession: session = %v", session)
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
 	}
 	defer tx.Rollback()
-	row := s.db.QueryRowContext(ctx,
+	row := tx.QueryRowContext(ctx,
 		`
 		SELECT 1
 			FROM sessions
@@ -30,14 +31,14 @@ func (s *SqliteStorage) AddSession(ctx context.Context, session models.Session) 
 	if err == sql.ErrNoRows {
 		exists = false
 	} else if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeRowScanHasFailed, domain, nil)
 	} else {
 		exists = true
 	}
 	if exists {
-		return errors.New("session already exists")
+		return errors.NewAppError(errors.ErrCodeSessionAlreadyExists, domain, nil)
 	}
-	_, err = s.db.ExecContext(ctx,
+	_, err = tx.ExecContext(ctx,
 		`
 		INSERT INTO sessions
 			(access_token, refresh_token, user_name, 
@@ -50,36 +51,38 @@ func (s *SqliteStorage) AddSession(ctx context.Context, session models.Session) 
 		session.ArchivedOn, session.Archived,
 	)
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeInsertingSession, domain, err)
 	}
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeDBTxCommitHasFailed, domain, err)
 	}
 	return nil
 }
 
 func (s *SqliteStorage) GetSessionByAccessToken(ctx context.Context, accessToken string) (models.Session, error) {
+	domain := fmt.Sprintf("sqliteStorage.SqliteStorage.GetSessionByAccessToken: accessToken = %s", accessToken)
 	tx, err := s.db.Begin()
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
 	}
 	defer tx.Rollback()
 	session, err := s.getSessionByAccessToken(ctx, accessToken, tx)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeGettingSession, domain, err)
 	}
 	err = tx.Commit()
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeDBTxCommitHasFailed, domain, err)
 	}
 	return session, nil
 }
 
 func (s *SqliteStorage) UpdateSessionByAccessToken(ctx context.Context, accessToken string, update models.SessionUpdate) (models.Session, error) {
+	domain := fmt.Sprintf("sqliteStorage.SqliteStorage.UpdateSessionByAccessToken: accessToken = %s, update = %v", accessToken, update)
 	tx, err := s.db.Begin()
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
 	}
 	defer tx.Rollback()
 	row := tx.QueryRowContext(ctx,
@@ -94,10 +97,10 @@ func (s *SqliteStorage) UpdateSessionByAccessToken(ctx context.Context, accessTo
 	var count int
 	err = row.Scan(&count)
 	if err == sql.ErrNoRows {
-		return models.Session{}, errors.New("session does not exist")
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionDoesNotExist, domain, nil)
 	}
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeRowScanHasFailed, domain, err)
 	}
 	hasUpdate := false
 	columnNames := []string{}
@@ -113,7 +116,7 @@ func (s *SqliteStorage) UpdateSessionByAccessToken(ctx context.Context, accessTo
 		hasUpdate = true
 	}
 	if !hasUpdate {
-		return models.Session{}, errors.New("no session to update")
+		return models.Session{}, errors.NewAppError(errors.ErrCodeNoSessionToUpdate, domain, nil)
 	}
 	stmt, err := tx.Prepare(
 		fmt.Sprintf(
@@ -125,25 +128,26 @@ func (s *SqliteStorage) UpdateSessionByAccessToken(ctx context.Context, accessTo
 		),
 	)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodePreparingSessionUpdateStmt, domain, err)
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(append(columnValues, accessToken)...)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeExecutingSessionUpdateStmt, domain, err)
 	}
 	session, err := s.getSessionByAccessToken(ctx, accessToken, tx)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeGettingSession, domain, err)
 	}
 	err = tx.Commit()
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeDBTxCommitHasFailed, domain, err)
 	}
 	return session, nil
 }
 
 func (s *SqliteStorage) getSessionByAccessToken(ctx context.Context, accessToken string, tx *sql.Tx) (models.Session, error) {
+	domain := fmt.Sprintf("sqliteStorage.SqliteStorage.getSessionByAccessToken: accessToken = %s", accessToken)
 	row := tx.QueryRowContext(ctx,
 		`
 		SELECT access_token, refresh_token, user_name, 
@@ -166,23 +170,23 @@ func (s *SqliteStorage) getSessionByAccessToken(ctx context.Context, accessToken
 		&archivedOn, &archived,
 	)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeRowScanHasFailed, domain, err)
 	}
 	session.AccesTokenExpiry, err = toTime(accessTokenExpiry)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionAcccessTokenExpiryCannotBeDetermined, domain, err)
 	}
 	session.RefreshTokenExpiry, err = toTime(refresTokenExpiry)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionRefreshTokenExpiryCannotBeDetermined, domain, err)
 	}
 	session.CreatedOn, err = toTime(createdOn)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionCreationTimeCannotBeDetermined, domain, err)
 	}
 	session.ArchivedOn, err = toTime(archivedOn)
 	if err != nil {
-		return models.Session{}, err
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionArchivedTimeCannotBeDetermined, domain, err)
 	}
 	session.Archived = toBool(archived)
 	return session, nil

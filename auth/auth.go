@@ -4,8 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
+	"lena/errors"
 	"lena/models"
 	"lena/storages"
 	"math/rand"
@@ -63,7 +63,8 @@ func (s *Server) SignOut(ctx context.Context, accessToken string) error {
 		return err
 	}
 	if session.Archived {
-		return errors.New("session is already invalidated")
+		domain := fmt.Sprintf("auth.Server.SignOut: accessToken = %s", accessToken)
+		return errors.NewAppError(errors.ErrCodeSessionAlreadyInvalidated, domain, nil)
 	}
 	_, err = s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
 	if err != nil {
@@ -85,7 +86,8 @@ func (s *Server) Refresh(ctx context.Context, accessToken string, refreshToken s
 		return models.Session{}, err
 	}
 	if session.RefreshToken != refreshToken {
-		return models.Session{}, errors.New("invalid refresh token")
+		domain := fmt.Sprintf("auth.Server.Refresh: accessToken = %s, refreshToken = %s", accessToken, refreshToken)
+		return models.Session{}, errors.NewAppError(errors.ErrCodeInvalidRefreshToken, domain, nil)
 	}
 	_, err = s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
 	if err != nil {
@@ -100,22 +102,23 @@ func (s *Server) Refresh(ctx context.Context, accessToken string, refreshToken s
 }
 
 func (s *Server) verify(ctx context.Context, accessToken string) (models.Session, error) {
+	domain := fmt.Sprintf("auth.Server.verify: accessToken = %s", accessToken)
 	session, err := s.storage.GetSessionByAccessToken(ctx, accessToken)
 	if err != nil {
 		return models.Session{}, err
 	}
 	if session.Archived {
-		return models.Session{}, errors.New("session is already invalidated")
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionAlreadyInvalidated, domain, nil)
 	}
 	now := time.Now().UTC()
 	accesTokenExpired := now.Equal(session.AccesTokenExpiry) || now.After(session.AccesTokenExpiry)
 	refreshTokenExpired := now.Equal(session.RefreshTokenExpiry) || now.After(session.RefreshTokenExpiry)
 	if accesTokenExpired {
-		return models.Session{}, errors.New("session is already expired")
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionExpired, domain, nil)
 	}
 	if refreshTokenExpired {
 		s.storage.UpdateSessionByAccessToken(ctx, accessToken, s.newSessionUpdateForArchiving())
-		return models.Session{}, errors.New("session can no longer be extended")
+		return models.Session{}, errors.NewAppError(errors.ErrCodeSessionCanNoLongerBeExtended, domain, nil)
 	}
 	return session, nil
 }
@@ -123,7 +126,8 @@ func (s *Server) verify(ctx context.Context, accessToken string) (models.Session
 func (s *Server) hashPassword(password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return "", err
+		domain := "auth.Server.hashPassword: password = ****"
+		return "", errors.NewAppError(errors.ErrCodeHashingPassword, domain, err)
 	}
 	return string(hash), nil
 }
@@ -131,7 +135,8 @@ func (s *Server) hashPassword(password string) (string, error) {
 func (s *Server) verifyPassword(input string, stored string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(stored), []byte(input))
 	if err != nil {
-		return errors.New("invalid password")
+		domain := "auth.Server.verifyPassword: input = ****, stored = ****"
+		return errors.NewAppError(errors.ErrCodeInvalidPassword, domain, err)
 	}
 	return nil
 }

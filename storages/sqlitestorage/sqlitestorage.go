@@ -2,6 +2,8 @@ package sqlitestorage
 
 import (
 	"database/sql"
+	"fmt"
+	"lena/errors"
 	"lena/storages"
 	"time"
 
@@ -14,18 +16,20 @@ type SqliteStorage struct {
 }
 
 func NewSqliteStorage() (*SqliteStorage, error) {
+	domain := "sqlitestorage.NewSqliteStorage"
 	db, err := sql.Open("sqlite3", "lena_storage.sqlite")
 	if err != nil {
-		return nil, err
+		return nil, errors.NewAppError(errors.ErrCodeOpeningSqliteDB, domain, err)
 	}
 	err = migrate(db)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewAppError(errors.ErrCodeMigratingSqliteDB, domain, err)
 	}
 	return &SqliteStorage{db: db}, nil
 }
 
 func migrate(db *sql.DB) error {
+	domain := "sqlitestorage.migrate"
 	_, err := db.Exec(`
 			CREATE TABLE IF NOT EXISTS migrations (
 				version INTEGER PRIMARY KEY
@@ -33,46 +37,47 @@ func migrate(db *sql.DB) error {
 		`,
 	)
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeCreatingMigrationsTable, domain, err)
 	}
 	rows, err := db.Query("SELECT version FROM migrations")
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeQueryingMigrations, domain, err)
 	}
 	defer rows.Close()
 	appliedMigration := make(map[int]bool)
 	for rows.Next() {
 		var version int
 		if err := rows.Scan(&version); err != nil {
-			return err
+			return errors.NewAppError(errors.ErrCodeRowScanHasFailed, domain, err)
 		}
 		appliedMigration[version] = true
 	}
+	tx, err := db.Begin()
+	if err != nil {
+		return errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
+	}
+	defer tx.Rollback()
 	for _, migration := range migrations() {
 		if appliedMigration[migration.version] {
 			continue
 		}
-		tx, err := db.Begin()
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
+		domainWithVersion := fmt.Sprintf("%s: migration version = %d", domain, migration.version)
 		_, err = tx.Exec(migration.command)
 		if err != nil {
-			return err
+			return errors.NewAppError(errors.ErrCodeExecutingMigrationCmd, domainWithVersion, err)
 		}
 		err = migration.modify(tx)
 		if err != nil {
-			return err
+			return errors.NewAppError(errors.ErrCodeMigrationModify, domainWithVersion, err)
 		}
 		_, err = tx.Exec("INSERT INTO migrations (version) VALUES (?)", migration.version)
 		if err != nil {
-			return err
+			return errors.NewAppError(errors.ErrCodeInsertingMigration, domainWithVersion, err)
 		}
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return errors.NewAppError(errors.ErrCodeDBTxCommitHasFailed, domain, err)
 	}
 	return nil
 }

@@ -3,22 +3,24 @@ package sqlitestorage
 import (
 	"context"
 	"database/sql"
-	"errors"
+	"fmt"
+	"lena/errors"
 	"lena/models"
 )
 
 func (s *SqliteStorage) AddUser(ctx context.Context, user models.User) error {
+	domain := fmt.Sprintf("sqlitestorage.SqliteStorage.AddUser: user = %v", user)
 	tx, err := s.db.Begin()
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
 	}
 	defer tx.Rollback()
 	exists, err := s.checkUserIfExistingByName(ctx, user.Name, tx)
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeCheckingIfUserExists, domain, err)
 	}
 	if exists {
-		return errors.New("user already exists")
+		return errors.NewAppError(errors.ErrCodeUserAlreadyExists, domain, nil)
 	}
 	_, err = tx.ExecContext(ctx,
 		`
@@ -29,19 +31,20 @@ func (s *SqliteStorage) AddUser(ctx context.Context, user models.User) error {
 		user.Name, user.Password, user.CreatedOn,
 	)
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeQueryingUsers, domain, err)
 	}
 	err = tx.Commit()
 	if err != nil {
-		return err
+		return errors.NewAppError(errors.ErrCodeDBTxCommitHasFailed, domain, err)
 	}
 	return nil
 }
 
 func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.User, error) {
+	domain := fmt.Sprintf("sqlitestorage.SqliteStorage.GetUserByName: name = %s", name)
 	tx, err := s.db.Begin()
 	if err != nil {
-		return models.User{}, err
+		return models.User{}, errors.NewAppError(errors.ErrCodeCannotBeginDBTx, domain, err)
 	}
 	defer tx.Rollback()
 	row := tx.QueryRowContext(ctx,
@@ -56,20 +59,21 @@ func (s *SqliteStorage) GetUserByName(ctx context.Context, name string) (models.
 	user := models.User{}
 	err = row.Scan(&user.Name, &user.Password, &createdOn)
 	if err != nil {
-		return models.User{}, err
+		return models.User{}, errors.NewAppError(errors.ErrCodeRowScanHasFailed, domain, err)
 	}
 	user.CreatedOn, err = toTime(createdOn)
 	if err != nil {
-		return models.User{}, err
+		return models.User{}, errors.NewAppError(errors.ErrCodeUserCreationTimeCannotBeDetermined, domain, err)
 	}
 	err = tx.Commit()
 	if err != nil {
-		return models.User{}, err
+		return models.User{}, errors.NewAppError(errors.ErrCodeDBTxCommitHasFailed, domain, err)
 	}
 	return user, nil
 }
 
 func (s *SqliteStorage) checkUserIfExistingByName(ctx context.Context, name string, tx *sql.Tx) (bool, error) {
+	domain := fmt.Sprintf("sqlitestorage.SqliteStorage.checkUserIfExistingByName: name = %s", name)
 	row := tx.QueryRowContext(ctx,
 		`
 		SELECT 1
@@ -85,7 +89,7 @@ func (s *SqliteStorage) checkUserIfExistingByName(ctx context.Context, name stri
 		return false, nil
 	}
 	if err != nil {
-		return false, err
+		return false, errors.NewAppError(errors.ErrCodeRowScanHasFailed, domain, err)
 	}
 	return true, nil
 }
